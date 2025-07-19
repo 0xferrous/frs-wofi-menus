@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# DeFiLlama Protocol Selector using Wofi
+# DeFiLlama Protocol Selector using Rofi
 # Opens selected protocol's website in default browser
 
 set -euo pipefail
@@ -11,9 +11,9 @@ source "$SCRIPT_DIR/dfl-common.sh"
 
 # Main logic
 main() {
-    # Check if wofi is installed
-    if ! command -v wofi &> /dev/null; then
-        echo "Error: wofi is not installed. Please install it first." >&2
+    # Check if rofi is installed
+    if ! command -v rofi &> /dev/null; then
+        echo "Error: rofi is not installed. Please install it first." >&2
         exit 1
     fi
 
@@ -29,9 +29,9 @@ main() {
         exit 1
     fi
 
-    # Show wofi menu and get selection
+    # Show rofi menu and get selection
     local selected
-    selected=$(echo "$protocol_names" | wofi --show dmenu --prompt "Select DeFi Protocol" --insensitive --matching fuzzy)
+    selected=$(echo "$protocol_names" | rofi -dmenu -p "Select DeFi Protocol" -i -matching fuzzy)
 
     if [[ -n "$selected" ]]; then
         open_protocol "$selected"
@@ -47,10 +47,9 @@ case "${1:-}" in
         show_cache_info
         ;;
     --help|-h)
-        show_help "$(basename "$0")" "Wofi"
+        show_help "$(basename "$0")" "Rofi"
         ;;
     *)
         main
         ;;
 esac
-
