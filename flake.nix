@@ -1,5 +1,5 @@
 {
-  description = "0xferrous' DeFiLlama menu utilities for wofi and rofi";
+  description = "0xferrous' DeFiLlama menu utilities for xofi (wofi/rofi)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

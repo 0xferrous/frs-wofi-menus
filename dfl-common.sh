@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Configuration
-CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/frs-wofi-menus"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/frs-xofi-menus"
 CACHE_FILE="$CACHE_DIR/protocols.json"
 CACHE_MAX_AGE=$((24 * 60 * 60))  # 24 hours in seconds
 API_URL="https://api.llama.fi/lite/protocols2?b=2"
