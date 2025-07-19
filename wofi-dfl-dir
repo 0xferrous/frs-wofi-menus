@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+
+# DeFiLlama Protocol Selector using Wofi
+# Opens selected protocol's website in default browser
+
+set -euo pipefail
+
+# Configuration
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/frs-wofi-menus"
+CACHE_FILE="$CACHE_DIR/protocols.json"
+CACHE_MAX_AGE=$((24 * 60 * 60))  # 24 hours in seconds
+API_URL="https://api.llama.fi/lite/protocols2?b=2"
+
+# Create cache directory if it doesn't exist
+mkdir -p "$CACHE_DIR"
+
+# Function to check if cache is valid
+is_cache_valid() {
+    if [[ ! -f "$CACHE_FILE" ]]; then
+        return 1
+    fi
+
+    local cache_age=$(($(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)))
+    [[ $cache_age -lt $CACHE_MAX_AGE ]]
+}
+
+# Function to fetch data from API
+fetch_protocols() {
+    echo "Fetching protocol data..." >&2
+    if curl -s --fail "$API_URL" -o "$CACHE_FILE.tmp"; then
+        mv "$CACHE_FILE.tmp" "$CACHE_FILE"
+        echo "Protocol data updated successfully" >&2
+    else
+        echo "Error: Failed to fetch protocol data" >&2
+        rm -f "$CACHE_FILE.tmp"
+        return 1
+    fi
+}
+
+# Function to get protocol names for wofi
+get_protocol_names() {
+    jq -r '.protocols[] | select(.name != null and .url != null) | .name' "$CACHE_FILE" 2>/dev/null
+}
+
+# Main logic
+main() {
+    # Check if wofi is installed
+    if ! command -v wofi &> /dev/null; then
+        echo "Error: wofi is not installed. Please install it first." >&2
+        exit 1
+    fi
+
+    # Check if we need to refresh the cache
+    if ! is_cache_valid; then
+        fetch_protocols || {
+            # If fetch fails and we have old cache, use it
+            if [[ -f "$CACHE_FILE" ]]; then
+                echo "Warning: Using cached data (failed to update)" >&2
+            else
+                echo "Error: No cached data available" >&2
+                exit 1
+            fi
+        }
+    fi
+
+    # Get the list of protocol names
+    local protocol_names
+    protocol_names=$(get_protocol_names)
+
+    if [[ -z "$protocol_names" ]]; then
+        echo "Error: No protocols found" >&2
+        exit 1
+    fi
+
+    # Show wofi menu and get selection
+    local selected
+    selected=$(echo "$protocol_names" | wofi --show dmenu --prompt "Select DeFi Protocol" --insensitive --matching fuzzy)
+
+    if [[ -n "$selected" ]]; then
+        # Find the URL for the selected protocol
+        local url
+        url=$(jq -r --arg name "$selected" '.protocols[] |
+            select(.name == $name) |
+            .url' "$CACHE_FILE" 2>/dev/null | head -1)
+
+        if [[ -n "$url" ]]; then
+            # Open URL in default browser
+            xdg-open "$url" &
+            echo "Opening: $selected ($url)" >&2
+        else
+            echo "Error: Could not find URL for: $selected" >&2
+            exit 1
+        fi
+    fi
+}
+
+# Handle command line arguments
+case "${1:-}" in
+    --refresh|-r)
+        rm -f "$CACHE_FILE"
+        fetch_protocols
+        ;;
+    --cache-info|-i)
+        if [[ -f "$CACHE_FILE" ]]; then
+            echo "Cache file: $CACHE_FILE"
+            echo "Cache age: $(( ($(date +%s) - $(stat -c %Y "$CACHE_FILE")) / 3600 )) hours"
+            echo "Total protocols: $(jq '.protocols | length' "$CACHE_FILE" 2>/dev/null || echo "unknown")"
+        else
+            echo "No cache file found"
+        fi
+        ;;
+    --help|-h)
+        cat << EOF
+DeFiLlama Wofi Selector
+
+Usage: $(basename "$0") [OPTIONS]
+
+Options:
+  --refresh, -r     Force refresh the protocol cache
+  --cache-info, -i  Show cache information
+  --help, -h        Show this help message
+
+The selector caches protocol data for 24 hours in:
+  $CACHE_DIR
+
+Examples:
+  $(basename "$0")              # Show protocol selector
+  $(basename "$0") --refresh    # Update cache and show selector
+  $(basename "$0") --cache-info # Display cache status
+EOF
+        ;;
+    *)
+        main
+        ;;
+esac
+
